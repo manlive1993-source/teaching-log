@@ -348,8 +348,9 @@ async function saveLog() {
     files.push({ name: file.name, mimeType: file.type, data: b64 });
   }
 
-  const now     = new Date();
-  const dateTH  = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()+543}`;
+  const now      = new Date();
+  const thMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+  const dateTH   = `${now.getDate()} ${thMonths[now.getMonth()]} ${now.getFullYear() + 543}`;
 
   try {
     const res = await apiPost({
