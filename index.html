@@ -145,24 +145,23 @@ let logCache        = {};
 })();
 
 // ════════════════════════════════════════════════════════════
-//  API Helpers
+//  API Helper — ส่งทุก action เป็น GET เพื่อหลีกเลี่ยง CORS
+//  GAS ไม่รองรับ POST cross-origin (browser block preflight)
 // ════════════════════════════════════════════════════════════
-async function apiGet(params) {
-  const qs  = new URLSearchParams(params).toString();
-  const res = await fetch(`${GAS_URL}?${qs}`);
+async function apiCall(params) {
+  // ถ้ามี field ที่เป็น object/array ให้ JSON.stringify ก่อน
+  const flat = {};
+  for (const [k, v] of Object.entries(params)) {
+    flat[k] = (typeof v === 'object') ? JSON.stringify(v) : v;
+  }
+  const qs  = new URLSearchParams(flat).toString();
+  const res = await fetch(`${GAS_URL}?${qs}`, { redirect: 'follow' });
   return res.json();
 }
 
-async function apiPost(body) {
-  const res = await fetch(GAS_URL, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(body),
-    // GAS Web App ต้องการ redirect
-    redirect: 'follow',
-  });
-  return res.json();
-}
+// compat aliases
+const apiGet  = (p) => apiCall(p);
+const apiPost = (b) => apiCall(b);
 
 // ════════════════════════════════════════════════════════════
 //  Loader / Toast
