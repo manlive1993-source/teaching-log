@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>บันทึกการสอน</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&display=swap');
+    * { font-family: 'Sarabun', sans-serif; }
+    .day-active  { background:#1e4d8c; color:#fff; border-color:#1e4d8c; }
+    .card-active { border-color:#1e4d8c; background:#eff4fc; }
+    .toast       { animation: slideUp .3s ease; }
+    @keyframes slideUp { from { transform: translateY(20px); opacity:0; } to { transform: translateY(0); opacity:1; } }
+    textarea:focus, input:focus { outline:2px solid #1e4d8c; outline-offset:-1px; }
+    .spinner { border:3px solid #e5e7eb; border-top-color:#1e4d8c; border-radius:50%; width:32px; height:32px; animation:spin .8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .file-drop { border: 2px dashed #d1d5db; transition:border-color .2s; }
+    .file-drop:hover { border-color:#1e4d8c; }
+    .log-item:last-child { border-bottom:none; padding-bottom:0; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<!-- ════ GLOBAL LOADER ════ -->
+<div id="globalLoader" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center gap-3">
+  <div class="spinner"></div>
+  <p class="text-sm text-gray-500" id="loaderText">กำลังโหลดข้อมูลตารางสอน...</p>
+</div>
+
+<!-- ════ TOAST ════ -->
+<div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-full text-sm text-white shadow-lg toast"></div>
+
+<!-- ════ APP ════ -->
+<div class="max-w-lg mx-auto pb-12">
+
+  <!-- Top Bar -->
+  <div class="bg-white border-b border-gray-200 px-4 pt-4 pb-3 sticky top-0 z-10 shadow-sm">
+    <div class="flex items-center gap-2 mb-3">
+      <svg class="w-5 h-5 text-blue-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+      </svg>
+      <h1 class="text-base font-semibold text-gray-800">บันทึกการสอน</h1>
+    </div>
+    <!-- Day Tabs -->
+    <div class="grid grid-cols-5 gap-1.5" id="dayTabs"></div>
+  </div>
+
+  <!-- Schedule Section -->
+  <div class="px-4 pt-4">
+    <p class="text-xs text-gray-400 uppercase tracking-wide mb-2 font-medium">วิชาที่สอนวันนี้</p>
+    <div id="scheduleList"></div>
+  </div>
+
+  <!-- Detail Panel -->
+  <div id="detailPanel" class="hidden px-4 mt-3">
+    <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+      <!-- Detail Header -->
+      <div class="flex items-start justify-between px-4 pt-4 pb-3 border-b border-gray-100">
+        <div>
+          <p class="font-semibold text-gray-800" id="dSubjectName"></p>
+          <p class="text-xs text-gray-400 mt-0.5" id="dSubjectMeta"></p>
+        </div>
+        <button onclick="closeDetail()" class="text-gray-400 hover:text-gray-600 p-1 -mt-1 -mr-1 rounded-lg hover:bg-gray-100 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Form -->
+      <div class="px-4 py-4 border-b border-gray-100">
+        <label class="text-xs font-medium text-gray-500 block mb-1.5">รายละเอียดที่สอนวันนี้</label>
+        <textarea id="detailsInput" rows="3"
+          class="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 resize-y text-gray-700 bg-gray-50"
+          placeholder="เช่น สอนเรื่องสมการกำลังสอง นักเรียนทำแบบฝึกหัดในชั้น..."></textarea>
+
+        <!-- File Upload -->
+        <label class="text-xs font-medium text-gray-500 block mb-1.5 mt-3">แนบไฟล์ (ไม่บังคับ)</label>
+        <div class="file-drop rounded-xl p-3 text-center cursor-pointer bg-gray-50"
+             onclick="document.getElementById('fileInput').click()">
+          <svg class="w-6 h-6 text-gray-400 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+          </svg>
+          <p class="text-xs text-gray-400">กดเพื่อเลือกไฟล์ <span class="text-blue-700 font-medium">(รองรับหลายไฟล์)</span></p>
+          <input type="file" id="fileInput" multiple class="hidden" onchange="updateFileLabel(this)">
+        </div>
+        <p id="fileLabel" class="text-xs text-gray-400 mt-1.5 min-h-[1rem]"></p>
+
+        <!-- Save Button -->
+        <button id="saveBtn" onclick="saveLog()"
+          class="mt-3 w-full bg-blue-800 hover:bg-blue-900 text-white text-sm font-medium py-2.5 rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+          </svg>
+          บันทึกการสอน
+        </button>
+      </div>
+
+      <!-- History -->
+      <div class="px-4 py-4">
+        <p class="text-xs font-medium text-gray-500 mb-3 flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          ประวัติการสอน
+        </p>
+        <div id="logList"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  ⚙️  ตั้งค่า — แทนที่ URL หลังจาก Deploy GAS
+// ════════════════════════════════════════════════════════════
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwHMs3vwJaJrVeQfINyNI0QGG5su6rjsonNOR9h_L015MxXbC3UGSV_fgaht0M-cih5/exec';
+// ตัวอย่าง: 'https://script.google.com/macros/s/AKfycb.../exec'
+
+// ════════════════════════════════════════════════════════════
+//  State
+// ════════════════════════════════════════════════════════════
+const DAYS_TH  = ['จันทร์','อังคาร','พุธ','พฤหัสฯ','ศุกร์'];
+const DAY_KEYS = ['Mon','Tue','Wed','Thu','Fri'];
+
+let currentDay      = null;
+let selectedSubject = null;
+let scheduleCache   = {};
+let logCache        = {};
+
+// ════════════════════════════════════════════════════════════
+//  Init
+// ════════════════════════════════════════════════════════════
+(function init() {
+  const todayIdx = new Date().getDay() - 1; // 0=จ, 4=ศ
+  currentDay     = (todayIdx >= 0 && todayIdx <= 4) ? DAY_KEYS[todayIdx] : 'Mon';
+  renderDayTabs();
+  loadSchedule(currentDay);
+})();
+
+// ════════════════════════════════════════════════════════════
+//  API Helpers
+// ════════════════════════════════════════════════════════════
+async function apiGet(params) {
+  const qs  = new URLSearchParams(params).toString();
+  const res = await fetch(`${GAS_URL}?${qs}`);
+  return res.json();
+}
+
+async function apiPost(body) {
+  const res = await fetch(GAS_URL, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+    // GAS Web App ต้องการ redirect
+    redirect: 'follow',
+  });
+  return res.json();
+}
+
+// ════════════════════════════════════════════════════════════
+//  Loader / Toast
+// ════════════════════════════════════════════════════════════
+function showLoader(text = 'กำลังโหลด...') {
+  document.getElementById('loaderText').textContent = text;
+  document.getElementById('globalLoader').classList.remove('hidden');
+}
+function hideLoader() {
+  document.getElementById('globalLoader').classList.add('hidden');
+}
+let toastTimer;
+function showToast(msg, color = '#1e4d8c', duration = 2400) {
+  clearTimeout(toastTimer);
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = color;
+  t.classList.remove('hidden');
+  t.classList.add('toast');
+  toastTimer = setTimeout(() => {
+    t.classList.add('hidden');
+    t.classList.remove('toast');
+  }, duration);
+}
+
+// ════════════════════════════════════════════════════════════
+//  Day Tabs
+// ════════════════════════════════════════════════════════════
+function renderDayTabs() {
+  document.getElementById('dayTabs').innerHTML = DAY_KEYS.map((d, i) => `
+    <button onclick="selectDay('${d}')"
+      class="text-xs font-medium py-1.5 rounded-lg border transition
+             ${d === currentDay ? 'day-active' : 'bg-gray-50 text-gray-500 border-gray-200 hover:border-blue-300'}">
+      ${DAYS_TH[i]}
+    </button>`).join('');
+}
+
+function selectDay(day) {
+  currentDay = day;
+  selectedSubject = null;
+  document.getElementById('detailPanel').classList.add('hidden');
+  renderDayTabs();
+  loadSchedule(day);
+}
+
+// ════════════════════════════════════════════════════════════
+//  Schedule
+// ════════════════════════════════════════════════════════════
+async function loadSchedule(day) {
+  if (scheduleCache[day]) {
+    renderSchedule(scheduleCache[day]);
+    hideLoader();
+    return;
+  }
+  showLoader('กำลังโหลดข้อมูลตารางสอน...');
+  try {
+    const res = await apiGet({ action: 'getSchedule', day });
+    if (res.success) {
+      scheduleCache[day] = res.data;
+      renderSchedule(res.data);
+    } else {
+      showToast('โหลดตารางสอนไม่สำเร็จ: ' + res.error, '#dc2626');
+    }
+  } catch (e) {
+    showToast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', '#dc2626');
+  }
+  hideLoader();
+}
+
+function renderSchedule(items) {
+  const list = document.getElementById('scheduleList');
+  if (!items || !items.length) {
+    list.innerHTML = `
+      <div class="text-center py-10 text-gray-400">
+        <svg class="w-10 h-10 mx-auto mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        <p class="text-sm">ไม่มีคาบสอนวันนี้</p>
+      </div>`;
+    return;
+  }
+  list.innerHTML = items.map(s => {
+    const active = selectedSubject
+      && selectedSubject.subjectId === s.subjectId
+      && selectedSubject.classLevel === s.classLevel;
+    return `
+      <div onclick='selectSubject(${JSON.stringify(s)})'
+        class="flex items-center gap-3 bg-white border rounded-2xl px-3 py-3 mb-2 cursor-pointer transition hover:border-blue-300
+               ${active ? 'card-active border-blue-700' : 'border-gray-200'}">
+        <div class="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+          <svg class="w-5 h-5 text-blue-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+              d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-gray-800 truncate">${s.subjectName}</p>
+          <p class="text-xs text-gray-400 mt-0.5">⏰ ${s.time}</p>
+        </div>
+        <span class="text-xs bg-blue-50 text-blue-800 font-medium px-2 py-0.5 rounded-full flex-shrink-0">
+          ${s.classLevel}
+        </span>
+      </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════════
+//  Detail Panel
+// ════════════════════════════════════════════════════════════
+async function selectSubject(s) {
+  selectedSubject = s;
+  renderSchedule(scheduleCache[currentDay] || []);
+
+  document.getElementById('dSubjectName').textContent = s.subjectName;
+  document.getElementById('dSubjectMeta').textContent = `${s.classLevel} · ${s.time}`;
+  document.getElementById('detailsInput').value = '';
+  document.getElementById('fileLabel').textContent = '';
+  document.getElementById('fileInput').value = '';
+  document.getElementById('logList').innerHTML =
+    '<div class="text-center py-4"><div class="spinner mx-auto"></div></div>';
+  document.getElementById('detailPanel').classList.remove('hidden');
+  document.getElementById('detailPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  await loadLogs(s.subjectId);
+}
+
+function closeDetail() {
+  selectedSubject = null;
+  document.getElementById('detailPanel').classList.add('hidden');
+  renderSchedule(scheduleCache[currentDay] || []);
+}
+
+// ════════════════════════════════════════════════════════════
+//  Logs
+// ════════════════════════════════════════════════════════════
+async function loadLogs(subjectId) {
+  try {
+    const res = await apiGet({ action: 'getLogs', subjectId });
+    if (res.success) {
+      logCache[subjectId] = res.data;
+      renderLogs(res.data);
+    } else {
+      showToast('โหลดประวัติไม่สำเร็จ', '#dc2626');
+    }
+  } catch (e) {
+    showToast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', '#dc2626');
+  }
+}
+
+function renderLogs(logs) {
+  const list = document.getElementById('logList');
+  if (!logs || !logs.length) {
+    list.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">ยังไม่มีประวัติการสอนวิชานี้</p>';
+    return;
+  }
+  list.innerHTML = logs.map(l => `
+    <div class="log-item border-b border-gray-100 pb-3 mb-3" id="logItem-${l.logId}">
+      <p class="text-xs text-gray-400 mb-1">📅 ${l.date}</p>
+      <div id="logContent-${l.logId}" class="text-sm text-gray-600 leading-relaxed">${escHtml(l.details)}</div>
+      <div class="flex gap-2 mt-2 flex-wrap">
+        <button onclick="editLog('${l.logId}')"
+          class="text-xs border border-gray-200 rounded-lg px-2.5 py-1 text-gray-500 hover:bg-gray-50 flex items-center gap-1 transition">
+          ✏️ แก้ไข
+        </button>
+        <button onclick="deleteLog('${l.logId}')"
+          class="text-xs border border-gray-200 rounded-lg px-2.5 py-1 text-gray-500 hover:border-red-300 hover:text-red-500 flex items-center gap-1 transition">
+          🗑️ ลบ
+        </button>
+        <button onclick="${l.folderId ? `window.open('${l.folderUrl}','_blank')` : ''}"
+          ${!l.folderId ? 'disabled' : ''}
+          class="text-xs border rounded-lg px-2.5 py-1 flex items-center gap-1 transition
+                 ${l.folderId
+                    ? 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    : 'border-gray-100 text-gray-300 cursor-not-allowed'}">
+          📁 เปิดโฟลเดอร์
+        </button>
+      </div>
+    </div>`).join('');
+}
+
+// ════════════════════════════════════════════════════════════
+//  Save Log
+// ════════════════════════════════════════════════════════════
+async function saveLog() {
+  const details = document.getElementById('detailsInput').value.trim();
+  if (!details) { showToast('กรุณากรอกรายละเอียดก่อนบันทึก', '#f59e0b'); return; }
+
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> กำลังบันทึก...';
+  showToast('กำลังอัปโหลดไฟล์และบันทึกข้อมูล...', '#1e4d8c', 10000);
+
+  // แปลงไฟล์เป็น Base64
+  const fileInput = document.getElementById('fileInput');
+  const files     = [];
+  for (const file of fileInput.files) {
+    const b64 = await fileToBase64(file);
+    files.push({ name: file.name, mimeType: file.type, data: b64 });
+  }
+
+  const now     = new Date();
+  const dateTH  = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()+543}`;
+
+  try {
+    const res = await apiPost({
+      action:      'saveLog',
+      subjectId:   selectedSubject.subjectId,
+      subjectName: selectedSubject.subjectName,
+      date:        dateTH,
+      details,
+      files
+    });
+    if (res.success) {
+      showToast('บันทึกข้อมูลเรียบร้อยแล้ว ✓', '#15803d');
+      document.getElementById('detailsInput').value = '';
+      document.getElementById('fileInput').value    = '';
+      document.getElementById('fileLabel').textContent = '';
+      // รีเฟรช cache และ re-render
+      delete logCache[selectedSubject.subjectId];
+      await loadLogs(selectedSubject.subjectId);
+    } else {
+      showToast('บันทึกไม่สำเร็จ: ' + res.error, '#dc2626');
+    }
+  } catch (e) {
+    showToast('เกิดข้อผิดพลาด: ' + e.message, '#dc2626');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+      d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+    บันทึกการสอน`;
+}
+
+// ════════════════════════════════════════════════════════════
+//  Edit Log (Inline)
+// ════════════════════════════════════════════════════════════
+async function editLog(logId) {
+  const contentEl = document.getElementById('logContent-' + logId);
+  // ถ้ากำลัง edit อยู่ → บันทึก
+  if (contentEl.querySelector('textarea')) {
+    const newText = contentEl.querySelector('textarea').value.trim();
+    if (!newText) { showToast('กรุณากรอกรายละเอียด', '#f59e0b'); return; }
+    try {
+      const res = await apiPost({ action: 'updateLog', logId, details: newText });
+      if (res.success) {
+        contentEl.textContent = newText;
+        // อัปเดต cache
+        const sid = selectedSubject.subjectId;
+        if (logCache[sid]) {
+          const log = logCache[sid].find(l => l.logId === logId);
+          if (log) log.details = newText;
+        }
+        showToast('แก้ไขเรียบร้อยแล้ว ✓', '#15803d');
+      } else {
+        showToast('แก้ไขไม่สำเร็จ: ' + res.error, '#dc2626');
+      }
+    } catch (e) {
+      showToast('เกิดข้อผิดพลาด', '#dc2626');
+    }
+    return;
+  }
+  // เปิด edit mode
+  const origText = contentEl.textContent;
+  contentEl.innerHTML = `
+    <textarea class="w-full text-sm border border-blue-700 rounded-lg px-2.5 py-2 resize-y bg-blue-50 text-gray-700" rows="3">${origText}</textarea>`;
+  contentEl.querySelector('textarea').focus();
+}
+
+// ════════════════════════════════════════════════════════════
+//  Delete Log
+// ════════════════════════════════════════════════════════════
+async function deleteLog(logId) {
+  if (!confirm('ต้องการลบบันทึกนี้?\n(ไฟล์ใน Google Drive จะถูกลบด้วย)')) return;
+  try {
+    const res = await apiPost({ action: 'deleteLog', logId });
+    if (res.success) {
+      showToast('ลบข้อมูลการสอนเรียบร้อยแล้ว', '#15803d');
+      const sid = selectedSubject.subjectId;
+      if (logCache[sid]) {
+        logCache[sid] = logCache[sid].filter(l => l.logId !== logId);
+        renderLogs(logCache[sid]);
+      }
+    } else {
+      showToast('ลบไม่สำเร็จ: ' + res.error, '#dc2626');
+    }
+  } catch (e) {
+    showToast('เกิดข้อผิดพลาด', '#dc2626');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  File Upload Helper
+// ════════════════════════════════════════════════════════════
+function updateFileLabel(input) {
+  const lbl = document.getElementById('fileLabel');
+  lbl.textContent = input.files.length
+    ? `📎 เลือกแล้ว ${input.files.length} ไฟล์`
+    : '';
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
