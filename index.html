@@ -306,7 +306,7 @@ function renderLogs(logs) {
   }
   list.innerHTML = logs.map(l => `
     <div class="log-item border-b border-gray-100 pb-3 mb-3" id="logItem-${l.logId}">
-      <p class="text-xs text-gray-400 mb-1">📅 ${l.date}</p>
+      <p class="text-xs text-gray-400 mb-1">📅 ${formatThaiDate(l.date)}</p>
       <div id="logContent-${l.logId}" class="text-sm text-gray-600 leading-relaxed">${escHtml(l.details)}</div>
       <div class="flex gap-2 mt-2 flex-wrap">
         <button onclick="editLog('${l.logId}')"
@@ -348,9 +348,8 @@ async function saveLog() {
     files.push({ name: file.name, mimeType: file.type, data: b64 });
   }
 
-  const now      = new Date();
-  const thMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
-  const dateTH   = `${now.getDate()} ${thMonths[now.getMonth()]} ${now.getFullYear() + 543}`;
+  const now     = new Date();
+  const dateTH  = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()+543}`;
 
   try {
     const res = await apiPost({
@@ -470,6 +469,36 @@ function escHtml(str) {
   renderDayTabs();
   loadSchedule(currentDay);
 })();
+
+  function formatThaiDate(dateStr) {
+  if (!dateStr) return '';
+  try {
+    let cleanStr = dateStr.replace(/\s*\(.*\)/, '');
+    let d = new Date(cleanStr);
+
+    // ตรวจจับฟอร์แมต DD/MM/YYYY (เช่น 18/06/2569) เพื่อนำมาแปลงค่า
+    if (isNaN(d.getTime())) {
+      const parts = dateStr.split('/');
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        let year = parseInt(parts[2], 10);
+        if (year > 2400) year -= 543; // แปลง พ.ศ. เป็น ค.ศ. ชั่วคราวเพื่อให้ระบบ Date ประมวลผลได้ถูกต้อง
+        d = new Date(year, month, day);
+      }
+    }
+
+    if (!isNaN(d.getTime())) {
+      const thMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+      let year = d.getFullYear();
+      if (year < 2400) year += 543; // ปรับปีให้เป็น พ.ศ.
+      return `${d.getDate()} ${thMonths[d.getMonth()]} ${year}`; // แสดงผลเป็นเลขอารบิกตามฟอร์แมตระบบ UI
+    }
+  } catch (e) {
+    console.error('Error formatting date:', e);
+  }
+  return dateStr;
+}
 </script>
 </body>
 </html>
