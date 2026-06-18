@@ -107,7 +107,7 @@
 //  ⚙️  ตั้งค่า — แทนที่ URL หลังจาก Deploy GAS
 // ════════════════════════════════════════════════════════════
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwHMs3vwJaJrVeQfINyNI0QGG5su6rjsonNOR9h_L015MxXbC3UGSV_fgaht0M-cih5/exec'; 
-// ⚠️ อย่าลืมนำ URL ของเว็บแอปที่คุณ Deploy จาก GAS (ที่ลงท้ายด้วย /exec) มาวางแทนที่ข้อความข้างบนนี้ด้วยครับ
+// ⚠️ อย่าลืมนำ Web App URL ของคุณมาวางตรงนี้นะครับ
 
 // ════════════════════════════════════════════════════════════
 //  State
@@ -119,28 +119,34 @@ let currentDay      = null;
 let selectedSubject = null;
 let scheduleCache   = {};
 let logCache        = {};
-let toastTimer      = null; // ย้ายขึ้นมาอยู่บนสุด ป้องกันปัญหา ReferenceError
+let toastTimer      = null; // ประกาศไว้บนสุด ป้องกันปัญหา ReferenceError
 
 // ════════════════════════════════════════════════════════════
-//  API Helper — ส่งทุก action เป็น GET เพื่อหลีกเลี่ยง CORS
+//  API Helper — รองรับ POST จริงเพื่อส่งข้อมูลขนาดใหญ่และไฟล์
 // ════════════════════════════════════════════════════════════
-async function apiCall(params) {
-  if (GAS_URL === 'YOUR_GAS_WEB_APP_URL') {
-    showToast('กรุณาตั้งค่า GAS_URL ในไฟล์ index.html ก่อนใช้งาน', '#ea580c', 5000);
-    hideLoader();
-    return { success: false, error: 'URL ไม่ถูกต้อง' };
+async function apiCall(params, method = 'GET') {
+  if (method === 'POST') {
+    // ใช้ POST ร่วมกับ text/plain เพื่อหลบหลีก CORS Preflight (OPTIONS) บน GAS
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(params),
+      redirect: 'follow'
+    });
+    return res.json();
+  } else {
+    const flat = {};
+    for (const [k, v] of Object.entries(params)) {
+      flat[k] = (typeof v === 'object') ? JSON.stringify(v) : v;
+    }
+    const qs  = new URLSearchParams(flat).toString();
+    const res = await fetch(`${GAS_URL}?${qs}`, { redirect: 'follow' });
+    return res.json();
   }
-  const flat = {};
-  for (const [k, v] of Object.entries(params)) {
-    flat[k] = (typeof v === 'object') ? JSON.stringify(v) : v;
-  }
-  const qs  = new URLSearchParams(flat).toString();
-  const res = await fetch(`${GAS_URL}?${qs}`, { redirect: 'follow' });
-  return res.json();
 }
 
-const apiGet  = (p) => apiCall(p);
-const apiPost = (b) => apiCall(b);
+const apiGet  = (p) => apiCall(p, 'GET');
+const apiPost = (b) => apiCall(b, 'POST');
 
 // ════════════════════════════════════════════════════════════
 //  Loader / Toast
@@ -206,7 +212,7 @@ async function loadSchedule(day) {
       showToast('โหลดตารางสอนไม่สำเร็จ: ' + res.error, '#dc2626');
     }
   } catch (e) {
-    showToast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบการ Deploy เว็บแอป', '#dc2626');
+    showToast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบการ Deploy', '#dc2626');
   }
   hideLoader();
 }
@@ -333,7 +339,7 @@ async function saveLog() {
   const btn = document.getElementById('saveBtn');
   btn.disabled = true;
   btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> กำลังบันทึก...';
-  showToast('กำลังอัปโหลดไฟล์และบันทึกข้อมูล...', '#1e4d8c', 10000);
+  showToast('กำลังอัปโหลดไฟล์และบันทึกข้อมูล...', '#1e4d8c', 15000);
 
   const fileInput = document.getElementById('fileInput');
   const files     = [];
@@ -455,10 +461,10 @@ function escHtml(str) {
 }
 
 // ════════════════════════════════════════════════════════════
-//  Init — เรียกใช้งานฟังก์ชันเริ่มระบบ (ย้ายมาไว้ท้ายสุด)
+//  Init
 // ════════════════════════════════════════════════════════════
 (function init() {
-  const todayIdx = new Date().getDay() - 1; // 0=จ, 4=ศ
+  const todayIdx = new Date().getDay() - 1; 
   currentDay     = (todayIdx >= 0 && todayIdx <= 4) ? DAY_KEYS[todayIdx] : 'Mon';
   renderDayTabs();
   loadSchedule(currentDay);
