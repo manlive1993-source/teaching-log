@@ -22,19 +22,15 @@
 </head>
 <body class="bg-gray-50 min-h-screen">
 
-<!-- ════ GLOBAL LOADER ════ -->
 <div id="globalLoader" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center gap-3">
   <div class="spinner"></div>
   <p class="text-sm text-gray-500" id="loaderText">กำลังโหลดข้อมูลตารางสอน...</p>
 </div>
 
-<!-- ════ TOAST ════ -->
 <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-full text-sm text-white shadow-lg toast"></div>
 
-<!-- ════ APP ════ -->
 <div class="max-w-lg mx-auto pb-12">
 
-  <!-- Top Bar -->
   <div class="bg-white border-b border-gray-200 px-4 pt-4 pb-3 sticky top-0 z-10 shadow-sm">
     <div class="flex items-center gap-2 mb-3">
       <svg class="w-5 h-5 text-blue-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -43,20 +39,16 @@
       </svg>
       <h1 class="text-base font-semibold text-gray-800">บันทึกการสอน</h1>
     </div>
-    <!-- Day Tabs -->
     <div class="grid grid-cols-5 gap-1.5" id="dayTabs"></div>
   </div>
 
-  <!-- Schedule Section -->
   <div class="px-4 pt-4">
     <p class="text-xs text-gray-400 uppercase tracking-wide mb-2 font-medium">วิชาที่สอนวันนี้</p>
     <div id="scheduleList"></div>
   </div>
 
-  <!-- Detail Panel -->
   <div id="detailPanel" class="hidden px-4 mt-3">
     <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-      <!-- Detail Header -->
       <div class="flex items-start justify-between px-4 pt-4 pb-3 border-b border-gray-100">
         <div>
           <p class="font-semibold text-gray-800" id="dSubjectName"></p>
@@ -69,14 +61,12 @@
         </button>
       </div>
 
-      <!-- Form -->
       <div class="px-4 py-4 border-b border-gray-100">
         <label class="text-xs font-medium text-gray-500 block mb-1.5">รายละเอียดที่สอนวันนี้</label>
         <textarea id="detailsInput" rows="3"
           class="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 resize-y text-gray-700 bg-gray-50"
           placeholder="เช่น สอนเรื่องสมการกำลังสอง นักเรียนทำแบบฝึกหัดในชั้น..."></textarea>
 
-        <!-- File Upload -->
         <label class="text-xs font-medium text-gray-500 block mb-1.5 mt-3">แนบไฟล์ (ไม่บังคับ)</label>
         <div class="file-drop rounded-xl p-3 text-center cursor-pointer bg-gray-50"
              onclick="document.getElementById('fileInput').click()">
@@ -89,7 +79,6 @@
         </div>
         <p id="fileLabel" class="text-xs text-gray-400 mt-1.5 min-h-[1rem]"></p>
 
-        <!-- Save Button -->
         <button id="saveBtn" onclick="saveLog()"
           class="mt-3 w-full bg-blue-800 hover:bg-blue-900 text-white text-sm font-medium py-2.5 rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -100,7 +89,6 @@
         </button>
       </div>
 
-      <!-- History -->
       <div class="px-4 py-4">
         <p class="text-xs font-medium text-gray-500 mb-3 flex items-center gap-1.5">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -114,14 +102,12 @@
     </div>
   </div>
 
-</div><!-- /app -->
-
-<script>
+</div><script>
 // ════════════════════════════════════════════════════════════
 //  ⚙️  ตั้งค่า — แทนที่ URL หลังจาก Deploy GAS
 // ════════════════════════════════════════════════════════════
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbwHMs3vwJaJrVeQfINyNI0QGG5su6rjsonNOR9h_L015MxXbC3UGSV_fgaht0M-cih5/exec';
-// ตัวอย่าง: 'https://script.google.com/macros/s/AKfycb.../exec'
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwHMs3vwJaJrVeQfINyNI0QGG5su6rjsonNOR9h_L015MxXbC3UGSV_fgaht0M-cih5/exec'; 
+// ⚠️ อย่าลืมนำ URL ของเว็บแอปที่คุณ Deploy จาก GAS (ที่ลงท้ายด้วย /exec) มาวางแทนที่ข้อความข้างบนนี้ด้วยครับ
 
 // ════════════════════════════════════════════════════════════
 //  State
@@ -133,23 +119,17 @@ let currentDay      = null;
 let selectedSubject = null;
 let scheduleCache   = {};
 let logCache        = {};
-
-// ════════════════════════════════════════════════════════════
-//  Init
-// ════════════════════════════════════════════════════════════
-(function init() {
-  const todayIdx = new Date().getDay() - 1; // 0=จ, 4=ศ
-  currentDay     = (todayIdx >= 0 && todayIdx <= 4) ? DAY_KEYS[todayIdx] : 'Mon';
-  renderDayTabs();
-  loadSchedule(currentDay);
-})();
+let toastTimer      = null; // ย้ายขึ้นมาอยู่บนสุด ป้องกันปัญหา ReferenceError
 
 // ════════════════════════════════════════════════════════════
 //  API Helper — ส่งทุก action เป็น GET เพื่อหลีกเลี่ยง CORS
-//  GAS ไม่รองรับ POST cross-origin (browser block preflight)
 // ════════════════════════════════════════════════════════════
 async function apiCall(params) {
-  // ถ้ามี field ที่เป็น object/array ให้ JSON.stringify ก่อน
+  if (GAS_URL === 'YOUR_GAS_WEB_APP_URL') {
+    showToast('กรุณาตั้งค่า GAS_URL ในไฟล์ index.html ก่อนใช้งาน', '#ea580c', 5000);
+    hideLoader();
+    return { success: false, error: 'URL ไม่ถูกต้อง' };
+  }
   const flat = {};
   for (const [k, v] of Object.entries(params)) {
     flat[k] = (typeof v === 'object') ? JSON.stringify(v) : v;
@@ -159,23 +139,23 @@ async function apiCall(params) {
   return res.json();
 }
 
-// compat aliases
 const apiGet  = (p) => apiCall(p);
 const apiPost = (b) => apiCall(b);
 
 // ════════════════════════════════════════════════════════════
 //  Loader / Toast
 // ════════════════════════════════════════════════════════════
-let toastTimer = null;
 function showLoader(text = 'กำลังโหลด...') {
   document.getElementById('loaderText').textContent = text;
   document.getElementById('globalLoader').classList.remove('hidden');
 }
+
 function hideLoader() {
   document.getElementById('globalLoader').classList.add('hidden');
 }
+
 function showToast(msg, color = '#1e4d8c', duration = 2400) {
-  clearTimeout(toastTimer);
+  if (toastTimer) clearTimeout(toastTimer);
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.style.background = color;
@@ -226,7 +206,7 @@ async function loadSchedule(day) {
       showToast('โหลดตารางสอนไม่สำเร็จ: ' + res.error, '#dc2626');
     }
   } catch (e) {
-    showToast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', '#dc2626');
+    showToast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบการ Deploy เว็บแอป', '#dc2626');
   }
   hideLoader();
 }
@@ -355,7 +335,6 @@ async function saveLog() {
   btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> กำลังบันทึก...';
   showToast('กำลังอัปโหลดไฟล์และบันทึกข้อมูล...', '#1e4d8c', 10000);
 
-  // แปลงไฟล์เป็น Base64
   const fileInput = document.getElementById('fileInput');
   const files     = [];
   for (const file of fileInput.files) {
@@ -380,7 +359,6 @@ async function saveLog() {
       document.getElementById('detailsInput').value = '';
       document.getElementById('fileInput').value    = '';
       document.getElementById('fileLabel').textContent = '';
-      // รีเฟรช cache และ re-render
       delete logCache[selectedSubject.subjectId];
       await loadLogs(selectedSubject.subjectId);
     } else {
@@ -402,7 +380,6 @@ async function saveLog() {
 // ════════════════════════════════════════════════════════════
 async function editLog(logId) {
   const contentEl = document.getElementById('logContent-' + logId);
-  // ถ้ากำลัง edit อยู่ → บันทึก
   if (contentEl.querySelector('textarea')) {
     const newText = contentEl.querySelector('textarea').value.trim();
     if (!newText) { showToast('กรุณากรอกรายละเอียด', '#f59e0b'); return; }
@@ -410,7 +387,6 @@ async function editLog(logId) {
       const res = await apiPost({ action: 'updateLog', logId, details: newText });
       if (res.success) {
         contentEl.textContent = newText;
-        // อัปเดต cache
         const sid = selectedSubject.subjectId;
         if (logCache[sid]) {
           const log = logCache[sid].find(l => l.logId === logId);
@@ -425,7 +401,6 @@ async function editLog(logId) {
     }
     return;
   }
-  // เปิด edit mode
   const origText = contentEl.textContent;
   contentEl.innerHTML = `
     <textarea class="w-full text-sm border border-blue-700 rounded-lg px-2.5 py-2 resize-y bg-blue-50 text-gray-700" rows="3">${origText}</textarea>`;
@@ -478,6 +453,16 @@ function escHtml(str) {
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ════════════════════════════════════════════════════════════
+//  Init — เรียกใช้งานฟังก์ชันเริ่มระบบ (ย้ายมาไว้ท้ายสุด)
+// ════════════════════════════════════════════════════════════
+(function init() {
+  const todayIdx = new Date().getDay() - 1; // 0=จ, 4=ศ
+  currentDay     = (todayIdx >= 0 && todayIdx <= 4) ? DAY_KEYS[todayIdx] : 'Mon';
+  renderDayTabs();
+  loadSchedule(currentDay);
+})();
 </script>
 </body>
 </html>
