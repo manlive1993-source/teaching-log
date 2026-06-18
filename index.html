@@ -166,6 +166,7 @@ const apiPost = (b) => apiCall(b);
 // ════════════════════════════════════════════════════════════
 //  Loader / Toast
 // ════════════════════════════════════════════════════════════
+let toastTimer = null;
 function showLoader(text = 'กำลังโหลด...') {
   document.getElementById('loaderText').textContent = text;
   document.getElementById('globalLoader').classList.remove('hidden');
@@ -173,7 +174,6 @@ function showLoader(text = 'กำลังโหลด...') {
 function hideLoader() {
   document.getElementById('globalLoader').classList.add('hidden');
 }
-let toastTimer;
 function showToast(msg, color = '#1e4d8c', duration = 2400) {
   clearTimeout(toastTimer);
   const t = document.getElementById('toast');
